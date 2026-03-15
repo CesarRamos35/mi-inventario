@@ -17,10 +17,10 @@ export default function PaginaVentas() {
   useEffect(() => {
     const verificarYCargar = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) { 
-        router.push('/'); 
-        return; 
+
+      if (!session) {
+        router.push('/');
+        return;
       }
 
       // Guardamos el email del vendedor apenas entra a la página
@@ -53,23 +53,23 @@ export default function PaginaVentas() {
 
   const productoActual = productos.find(p => String(p.id) === seleccionado);
 
- const registrarVenta = async (e: React.FormEvent) => {
+  const registrarVenta = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productoActual) return alert("Selecciona producto");
-    
+
     setCargando(true);
 
     try {
-      // Usamos el estado "vendedor" que ya tiene el email real
-      const emailResponsable = vendedor; 
+      const emailResponsable = vendedor;
       const totalVenta = productoActual.precio * cantidad;
 
+      // 1. Guardar en Supabase
       const { error: errorVenta } = await supabase.from('ventas').insert([
-        { 
-          producto_id: productoActual.id, 
-          cantidad: cantidad, 
+        {
+          producto_id: productoActual.id,
+          cantidad: cantidad,
           total: totalVenta,
-          usuario_email: emailResponsable 
+          usuario_email: emailResponsable
         }
       ]);
 
@@ -84,28 +84,36 @@ export default function PaginaVentas() {
       if (errorStock) throw errorStock;
 
       // 3. Preparar datos para el recibo y disparar impresión
-     setUltimaVenta({
+      setUltimaVenta({
         producto: productoActual.nombre,
         precio: productoActual.precio,
         cantidad: cantidad,
         total: totalVenta,
-        vendedor: emailResponsable, // Aquí ya saldrá el correo real
+        vendedor: emailResponsable,
         fecha: new Date().toLocaleString('es-BO')
       });
 
       // Pequeña pausa para que el DOM se actualice con los datos del recibo
       setTimeout(() => {
-        window.print();
-        // Limpiamos el formulario tras imprimir
-        setSeleccionado("");
-        setCantidad(1);
-        setUltimaVenta(null);
-        // Recargar productos para ver stock actualizado sin refresh de página
-        const nuevosProductos = productos.map(p => 
-          p.id === productoActual.id ? {...p, stock: p.stock - cantidad} : p
-        );
-        setProductos(nuevosProductos);
-      }, 500);
+        const elementoRecibo = document.getElementById('recibo-impresion');
+        if (elementoRecibo && elementoRecibo.innerText.length > 0) {
+          window.print();
+
+          // Limpieza después de imprimir
+          setSeleccionado("");
+          setCantidad(1);
+          setUltimaVenta(null);
+
+          const nuevosProductos = productos.map(p =>
+            p.id === productoActual.id ? { ...p, stock: p.stock - cantidad } : p
+          );
+          setProductos(nuevosProductos);
+        } else {
+          // Si falló el render rápido, reintentamos una vez más
+          console.log("Reintentando renderizado de recibo...");
+          window.print();
+        }
+      }, 800); // 800ms es el "punto dulce" para procesadores móviles
 
     } catch (err: any) {
       alert("Error: " + (err.message || "Error inesperado"));
@@ -159,7 +167,7 @@ export default function PaginaVentas() {
         <form onSubmit={registrarVenta} className="bg-white p-8 rounded-3xl shadow-2xl border border-gray-100 space-y-6">
           <div>
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Producto a Vender</label>
-            <select 
+            <select
               className="w-full p-4 border border-gray-200 rounded-xl mt-1 bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none transition-all font-medium"
               value={seleccionado}
               onChange={(e) => setSeleccionado(e.target.value)}
@@ -176,11 +184,11 @@ export default function PaginaVentas() {
 
           <div>
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Cantidad</label>
-            <input 
-              type="number" 
+            <input
+              type="number"
               min="1"
               className="w-full p-4 border border-gray-200 rounded-xl mt-1 bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none transition-all font-bold"
-              value={cantidad} 
+              value={cantidad}
               onChange={(e) => setCantidad(Number(e.target.value))}
               required
             />
@@ -196,7 +204,7 @@ export default function PaginaVentas() {
             </div>
           )}
 
-          <button 
+          <button
             type="submit"
             disabled={cargando || !seleccionado}
             className="w-full bg-green-600 hover:bg-green-700 text-white py-5 rounded-2xl font-black shadow-xl transition-all active:scale-95 disabled:opacity-50 uppercase tracking-widest"
