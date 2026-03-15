@@ -38,34 +38,48 @@ export default function PaginaVentas() {
 
     setCargando(true);
 
-    // 1. Insertar en la tabla de Ventas
-    const { error: errorVenta } = await supabase.from('ventas').insert([
-      { 
-        producto_id: productoActual.id, 
-        cantidad: cantidad, 
-        total: productoActual.precio * cantidad 
+    try {
+      // 1. FORMA BLINDADA DE OBTENER EL USUARIO
+      const { data: { user } } = await supabase.auth.getUser(); 
+      const emailResponsable = user?.email || "usuario.anonimo@test.com";
+      
+      console.log("Revisando email antes de enviar:", emailResponsable);
+
+      // 2. Insertar en la tabla de Ventas
+      const { error: errorVenta } = await supabase.from('ventas').insert([
+        { 
+          producto_id: productoActual.id, 
+          cantidad: cantidad, 
+          total: productoActual.precio * cantidad,
+          usuario_email: emailResponsable // <-- Asegúrate que diga exactamente esto
+        }
+      ]);
+
+      if (errorVenta) {
+        console.error("Error de Supabase:", errorVenta);
+        alert("Error al registrar venta: " + errorVenta.message);
+        setCargando(false);
+        return;
       }
-    ]);
 
-    if (errorVenta) {
-      alert("Error al registrar venta: " + errorVenta.message);
+      // 3. Actualizar el Stock
+      const { error: errorStock } = await supabase
+        .from('Productos')
+        .update({ stock: productoActual.stock - cantidad })
+        .eq('id', productoActual.id);
+
+      if (errorStock) {
+        alert("Venta registrada pero el stock NO bajó.");
+      } else {
+        alert(`✅ Venta exitosa por: ${emailResponsable}`);
+        // En lugar de reload, podrías limpiar estados, pero reload sirve por ahora
+        window.location.reload(); 
+      }
+    } catch (err) {
+      alert("Error inesperado en el sistema");
+    } finally {
       setCargando(false);
-      return;
     }
-
-    // 2. Actualizar el Stock en la tabla Productos
-    const { error: errorStock } = await supabase
-      .from('Productos')
-      .update({ stock: productoActual.stock - cantidad })
-      .eq('id', productoActual.id);
-
-    if (errorStock) {
-      alert("Venta registrada pero el stock NO bajó: " + errorStock.message);
-    } else {
-      alert("✅ Venta realizada con éxito. El stock se ha actualizado.");
-      window.location.reload(); // Recargar para actualizar lista
-    }
-    setCargando(false);
   };
 
   return (

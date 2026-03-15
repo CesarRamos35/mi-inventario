@@ -203,7 +203,7 @@ export default function PaginaReportes() {
       {/* BARRA DE FILTROS */}
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mb-8 grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
-          <label className="text-[10px] font-black text-gray-400 uppercase ml-2 block mb-1">Buscar por nombre</label>
+          <label className="text-[10px] font-black text-gray-400 uppercase ml-2 block mb-1">Buscar por Producto</label>
           <input type="text" className="w-full p-3 bg-gray-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-black" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
         </div>
         <div>

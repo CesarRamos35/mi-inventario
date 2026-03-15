@@ -21,7 +21,7 @@ export default function PaginaHistorial() {
         .from('Historial')
         .select('*');
 
-      // 2. Cargamos las Ventas para integrarlas como "SALIDAS"
+      // 2. Cargamos las Ventas integrando el nuevo campo usuario_email
       const { data: ventasData } = await supabase
         .from('ventas')
         .select('*, Productos(nombre)')
@@ -29,19 +29,20 @@ export default function PaginaHistorial() {
 
       // 3. Unificamos los formatos
       const logsHistorial = (historialData || []).map(h => ({
-  ...h,
-  usuario_email: h.usuario_email || "Sistema@negocio.com", // Si es null, le ponemos uno por defecto
-  fecha: h.fecha || new Date().toISOString()
-}));
+        ...h,
+        usuario_email: h.usuario_email || "sistema@negocio.com",
+        fecha: h.fecha || new Date().toISOString()
+      }));
 
-const logsVentas = (ventasData || []).map(v => ({
-  id: v.id,
-  fecha: v.created_at,
-  usuario_email: "Venta@caja.com", // Las ventas suelen no tener email de usuario logueado, le ponemos este
-  producto_nombre: v.Productos?.nombre || "Producto Eliminado",
-  accion: 'VENTA',
-  detalles: `Salida de ${v.cantidad} unidades`
-}));
+      const logsVentas = (ventasData || []).map(v => ({
+        id: v.id,
+        fecha: v.created_at,
+        // CAMBIO AQUÍ: Ahora usamos el email real de la tabla ventas
+        usuario_email: v.usuario_email || "venta.antigua@caja.com", 
+        producto_nombre: v.Productos?.nombre || "Producto Eliminado",
+        accion: 'VENTA',
+        detalles: `Salida de ${v.cantidad} unidades`
+      }));
 
       // 4. Mezclamos y ordenamos por fecha
       const unificados = [...logsHistorial, ...logsVentas].sort((a, b) => 
@@ -56,7 +57,6 @@ const logsVentas = (ventasData || []).map(v => ({
 
   // --- LÓGICA DE FILTRADO ---
   const logsFiltrados = logs.filter(log => {
-    // Usamos (log.usuario_email || "") para que si es null, use un texto vacío y no explote
     const coincideUsuario = (log.usuario_email || "Sistema")
       .toLowerCase()
       .includes(filtroUsuario.toLowerCase());
@@ -69,9 +69,17 @@ const logsVentas = (ventasData || []).map(v => ({
     <main className="p-10 max-w-6xl mx-auto text-black">
       <div className="flex justify-between items-end mb-8">
         <div>
-          <Link href="/inventario" className="text-indigo-600 text-[10px] font-black uppercase tracking-widest hover:underline">
-            ← Volver al Inventario
-          </Link>
+          {/* NUEVOS LINKS DE NAVEGACIÓN */}
+          <div className="flex gap-4 mb-2">
+            <Link href="/" className="text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-indigo-600 transition-colors">
+              🏠 Menú Principal
+            </Link>
+            <span className="text-gray-300 text-[10px]">|</span>
+            <Link href="/inventario" className="text-indigo-600 text-[10px] font-black uppercase tracking-widest hover:underline">
+              📦 Mostrar Inventario
+            </Link>
+          </div>
+          
           <h1 className="text-4xl font-black tracking-tighter uppercase">Libro de Auditoría</h1>
           <p className="text-gray-400 text-xs font-bold uppercase">Movimientos manuales y ventas registradas</p>
         </div>
@@ -80,7 +88,7 @@ const logsVentas = (ventasData || []).map(v => ({
       {/* BARRA DE BÚSQUEDA Y FILTROS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-          <label className="text-[10px] font-black text-gray-400 uppercase mb-1 block ml-2">Filtrar por Usuario</label>
+          <label className="text-[10px] font-black text-gray-400 uppercase mb-1 block ml-2">Filtrar por Usuario (Email)</label>
           <input 
             type="text" 
             placeholder="Ej: admin..."
@@ -118,7 +126,8 @@ const logsVentas = (ventasData || []).map(v => ({
           </thead>
           <tbody className="divide-y divide-gray-100">
             {logsFiltrados.map((log) => {
-              const nombreLimpio = log.usuario_email.split('@')[0];
+              // Extraemos el nombre antes del @ para el avatar y el texto
+              const nombreLimpio = log.usuario_email ? log.usuario_email.split('@')[0] : "usuario";
               const esVenta = log.accion === 'VENTA';
 
               return (
