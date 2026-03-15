@@ -9,27 +9,32 @@ export default function BotonEliminar({ id, nombre }: { id: number, nombre: stri
   const [eliminando, setEliminando] = useState(false)
   const router = useRouter()
 
-  const eliminar = async () => {
-    if (!confirm(`¿Estás seguro de eliminar "${nombre}"?`)) return
+  const eliminarProducto = async () => {
+  const confirmar = confirm(`¿Estás seguro de eliminar ${nombre}?`);
+  if (!confirmar) return;
 
-    setEliminando(true)
+  try {
     const { error } = await supabase
       .from('Productos')
       .delete()
-      .eq('id', id)
+      .eq('id', id);
 
     if (error) {
-      toast.error("Error al eliminar")
-    } else {
-      toast.success("Producto eliminado")
-      router.refresh()
+      // ESTO NOS DIRÁ EL ERROR REAL EN UN TOAST
+      toast.error(`Error de Supabase: ${error.message}`);
+      console.error("Detalle completo:", error);
+      return;
     }
-    setEliminando(false)
+
+    toast.success("Producto eliminado");
+  } catch (error: any) {
+    toast.error("Error de conexión: " + error.message);
   }
+};
 
   return (
-    <button 
-      onClick={eliminar}
+    <button
+      onClick={eliminarProducto}
       disabled={eliminando}
       className="text-red-600 hover:text-red-900 font-medium disabled:opacity-50"
     >
