@@ -38,14 +38,14 @@ export default function PaginaHistorial() {
         id: v.id,
         fecha: v.created_at,
         // CAMBIO AQUÍ: Ahora usamos el email real de la tabla ventas
-        usuario_email: v.usuario_email || "venta.antigua@caja.com", 
+        usuario_email: v.usuario_email || "venta.antigua@caja.com",
         producto_nombre: v.Productos?.nombre || "Producto Eliminado",
         accion: 'VENTA',
         detalles: `Salida de ${v.cantidad} unidades`
       }));
 
       // 4. Mezclamos y ordenamos por fecha
-      const unificados = [...logsHistorial, ...logsVentas].sort((a, b) => 
+      const unificados = [...logsHistorial, ...logsVentas].sort((a, b) =>
         new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
       );
 
@@ -60,7 +60,7 @@ export default function PaginaHistorial() {
     const coincideUsuario = (log.usuario_email || "Sistema")
       .toLowerCase()
       .includes(filtroUsuario.toLowerCase());
-      
+
     const coincideAccion = filtroAccion === "" ? true : log.accion === filtroAccion;
     return coincideUsuario && coincideAccion;
   });
@@ -79,7 +79,7 @@ export default function PaginaHistorial() {
               📦 Mostrar Inventario
             </Link>
           </div>
-          
+
           <h1 className="text-4xl font-black tracking-tighter uppercase">Libro de Auditoría</h1>
           <p className="text-gray-400 text-xs font-bold uppercase">Movimientos manuales y ventas registradas</p>
         </div>
@@ -89,8 +89,8 @@ export default function PaginaHistorial() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
           <label className="text-[10px] font-black text-gray-400 uppercase mb-1 block ml-2">Filtrar por Usuario (Email)</label>
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Ej: admin..."
             className="w-full p-2 bg-gray-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
             value={filtroUsuario}
@@ -99,7 +99,7 @@ export default function PaginaHistorial() {
         </div>
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
           <label className="text-[10px] font-black text-gray-400 uppercase mb-1 block ml-2">Tipo de Acción</label>
-          <select 
+          <select
             className="w-full p-2 bg-gray-50 rounded-xl text-sm font-bold outline-none cursor-pointer"
             value={filtroAccion}
             onChange={(e) => setFiltroAccion(e.target.value)}
@@ -114,65 +114,68 @@ export default function PaginaHistorial() {
       </div>
 
       <div className="bg-white shadow-2xl rounded-[2rem] overflow-hidden border border-gray-100">
-        <table className="min-w-full">
-          <thead className="bg-gray-900 text-white">
-            <tr>
-              <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Fecha y Hora</th>
-              <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Responsable</th>
-              <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Producto</th>
-              <th className="px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest">Evento</th>
-              <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Descripción</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {logsFiltrados.map((log) => {
-              // Extraemos el nombre antes del @ para el avatar y el texto
-              const nombreLimpio = log.usuario_email ? log.usuario_email.split('@')[0] : "usuario";
-              const esVenta = log.accion === 'VENTA';
-
-              return (
-                <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 text-[11px] font-bold text-gray-500 whitespace-nowrap">
-                    {new Date(log.fecha).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                  </td>
-
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black border ${esVenta ? 'bg-green-100 border-green-200 text-green-700' : 'bg-indigo-100 border-indigo-200 text-indigo-700'}`}>
-                        {nombreLimpio.substring(0, 1).toUpperCase()}
-                      </div>
-                      <span className="text-xs font-bold text-gray-700 capitalize">{nombreLimpio}</span>
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4 text-sm font-black text-gray-900">
-                    {log.producto_nombre}
-                  </td>
-
-                  <td className="px-6 py-4 text-center">
-                    <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase ${
-                      log.accion === 'CREACIÓN' ? 'bg-green-50 text-green-600' : 
-                      log.accion === 'EDICIÓN' ? 'bg-blue-50 text-blue-600' : 
-                      log.accion === 'VENTA' ? 'bg-orange-50 text-orange-600' : 'bg-red-50 text-red-600'
-                    }`}>
-                      {log.accion}
-                    </span>
-                  </td>
-
-                  <td className="px-6 py-4 text-xs text-gray-500 italic font-medium">
-                    {log.detalles}
-                  </td>
+        <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto"> {/* <--- ESTA LÍNEA ES MAGIA */}
+            <table className="min-w-full text-left whitespace-nowrap">
+              <thead className="bg-gray-900 text-white">
+                <tr>
+                  <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Fecha y Hora</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Responsable</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Producto</th>
+                  <th className="px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest">Evento</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest">Descripción</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        
-        {logsFiltrados.length === 0 && (
-          <div className="text-center py-20">
-            <p className="text-gray-400 font-black uppercase text-xs tracking-tighter animate-pulse">Sin resultados para esta búsqueda</p>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {logsFiltrados.map((log) => {
+                  // Extraemos el nombre antes del @ para el avatar y el texto
+                  const nombreLimpio = log.usuario_email ? log.usuario_email.split('@')[0] : "usuario";
+                  const esVenta = log.accion === 'VENTA';
+
+                  return (
+                    <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 text-[11px] font-bold text-gray-500 whitespace-nowrap">
+                        {new Date(log.fecha).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black border ${esVenta ? 'bg-green-100 border-green-200 text-green-700' : 'bg-indigo-100 border-indigo-200 text-indigo-700'}`}>
+                            {nombreLimpio.substring(0, 1).toUpperCase()}
+                          </div>
+                          <span className="text-xs font-bold text-gray-700 capitalize">{nombreLimpio}</span>
+                        </div>
+                      </td>
+
+                      <td className="px-6 py-4 text-sm font-black text-gray-900">
+                        {log.producto_nombre}
+                      </td>
+
+                      <td className="px-6 py-4 text-center">
+                        <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase ${log.accion === 'CREACIÓN' ? 'bg-green-50 text-green-600' :
+                            log.accion === 'EDICIÓN' ? 'bg-blue-50 text-blue-600' :
+                              log.accion === 'VENTA' ? 'bg-orange-50 text-orange-600' : 'bg-red-50 text-red-600'
+                          }`}>
+                          {log.accion}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4 text-xs text-gray-500 italic font-medium">
+                        {log.detalles}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {logsFiltrados.length === 0 && (
+              <div className="text-center py-20">
+                <p className="text-gray-400 font-black uppercase text-xs tracking-tighter animate-pulse">Sin resultados para esta búsqueda</p>
+              </div>
+            )}
           </div>
-        )}
+        </section>
       </div>
     </main>
   );

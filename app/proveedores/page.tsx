@@ -7,12 +7,12 @@ export default function PaginaProveedores() {
   const [proveedores, setProveedores] = useState<any[]>([]);
   const [productosSurtidos, setProductosSurtidos] = useState<any[]>([]);
   const [idSeleccionado, setIdSeleccionado] = useState<number | null>(null);
-  
+
   // Estados para el formulario
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [direccion, setDireccion] = useState("");
-  
+
   const [cargando, setCargando] = useState(true);
   const [editando, setEditando] = useState(false);
 
@@ -33,7 +33,7 @@ export default function PaginaProveedores() {
     setEditando(true);
 
     const { data } = await supabase
-      .from('Productos') 
+      .from('Productos')
       .select('*')
       .eq('proveedor_id', prov.id);
     setProductosSurtidos(data || []);
@@ -42,19 +42,19 @@ export default function PaginaProveedores() {
   // 2. AGREGAR O EDITAR
   const manejarEnvio = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (editando && idSeleccionado) {
       const { error } = await supabase
         .from('proveedores')
         .update({ nombre, telefono, direccion })
         .eq('id', idSeleccionado);
-      
+
       if (!error) alert("✅ Proveedor actualizado");
     } else {
       const { error } = await supabase
         .from('proveedores')
         .insert([{ nombre, telefono, direccion }]);
-      
+
       if (!error) alert("✅ Proveedor registrado");
     }
 
@@ -65,7 +65,7 @@ export default function PaginaProveedores() {
   // 3. ELIMINAR PROVEEDOR (Nueva función)
   const borrarProveedor = async (id: number, nombreProv: string) => {
     const confirmar = window.confirm(`¿Estás seguro de eliminar a "${nombreProv}"? Esta acción no se puede deshacer.`);
-    
+
     if (confirmar) {
       const { error } = await supabase
         .from('proveedores')
@@ -95,7 +95,7 @@ export default function PaginaProveedores() {
       <h1 className="text-4xl font-black my-6 tracking-tighter uppercase">Directorio de Proveedores 🤝</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
+
         {/* FORMULARIO DINÁMICO */}
         <section className={`p-8 rounded-3xl shadow-xl border transition-all h-fit ${editando ? 'bg-slate-900 text-white border-slate-800' : 'bg-white border-gray-100'}`}>
           <div className="flex justify-between items-center mb-6">
@@ -108,21 +108,21 @@ export default function PaginaProveedores() {
           <form onSubmit={manejarEnvio} className="space-y-4">
             <div>
               <label className={`text-[10px] font-black uppercase tracking-widest ml-1 ${editando ? 'text-slate-400' : 'text-gray-400'}`}>Nombre Empresa</label>
-              <input 
+              <input
                 type="text" className={`w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 ${editando ? 'bg-slate-800 border-slate-700 text-white' : 'bg-gray-50'}`}
                 value={nombre} onChange={(e) => setNombre(e.target.value)} required
               />
             </div>
             <div>
               <label className={`text-[10px] font-black uppercase tracking-widest ml-1 ${editando ? 'text-slate-400' : 'text-gray-400'}`}>Teléfono</label>
-              <input 
+              <input
                 type="text" className={`w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 ${editando ? 'bg-slate-800 border-slate-700 text-white' : 'bg-gray-50'}`}
                 value={telefono} onChange={(e) => setTelefono(e.target.value)}
               />
             </div>
             <div>
               <label className={`text-[10px] font-black uppercase tracking-widest ml-1 ${editando ? 'text-slate-400' : 'text-gray-400'}`}>Dirección</label>
-              <input 
+              <input
                 type="text" className={`w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 ${editando ? 'bg-slate-800 border-slate-700 text-white' : 'bg-gray-50'}`}
                 value={direccion} onChange={(e) => setDireccion(e.target.value)}
               />
@@ -134,41 +134,44 @@ export default function PaginaProveedores() {
         </section>
 
         {/* TABLA Y LISTA DE PRODUCTOS */}
+
         <div className="lg:col-span-2 space-y-6">
           <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-            <table className="min-w-full text-left">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase">Empresa</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase">Contacto</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase text-right">Acción</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {proveedores.map(p => (
-                  <tr key={p.id} className={`transition-colors ${idSeleccionado === p.id ? 'bg-indigo-50' : 'hover:bg-gray-50'}`}>
-                    <td className="px-6 py-4 font-bold text-gray-800">{p.nombre}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{p.telefono || '—'}</td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button 
-                          onClick={() => seleccionarProveedor(p)}
-                          className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg hover:bg-indigo-600 hover:text-white transition-all"
-                        >
-                          GESTIONAR
-                        </button>
-                        <button 
-                          onClick={() => borrarProveedor(p.id, p.nombre)}
-                          className="text-[10px] font-black bg-red-100 text-red-700 px-3 py-1 rounded-lg hover:bg-red-600 hover:text-white transition-all"
-                        >
-                          ELIMINAR
-                        </button>
-                      </div>
-                    </td>
+            <div className="overflow-x-auto"> {/* <--- ESTA LÍNEA ES MAGIA */}
+              <table className="min-w-full text-left whitespace-nowrap">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase">Empresa</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase">Contacto</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase text-right">Acción</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {proveedores.map(p => (
+                    <tr key={p.id} className={`transition-colors ${idSeleccionado === p.id ? 'bg-indigo-50' : 'hover:bg-gray-50'}`}>
+                      <td className="px-6 py-4 font-bold text-gray-800">{p.nombre}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{p.telefono || '—'}</td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => seleccionarProveedor(p)}
+                            className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg hover:bg-indigo-600 hover:text-white transition-all"
+                          >
+                            GESTIONAR
+                          </button>
+                          <button
+                            onClick={() => borrarProveedor(p.id, p.nombre)}
+                            className="text-[10px] font-black bg-red-100 text-red-700 px-3 py-1 rounded-lg hover:bg-red-600 hover:text-white transition-all"
+                          >
+                            ELIMINAR
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
 
           {/* LISTA DE PRODUCTOS SURTIDOS */}

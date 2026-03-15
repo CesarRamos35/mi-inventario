@@ -225,45 +225,49 @@ export default function PaginaReportes() {
       </div>
 
       <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden">
-        <table className="min-w-full">
-          <thead>
-            <tr className={vista === 'inventario' ? "bg-indigo-600 text-white" : "bg-green-600 text-white"}>
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-left">Referencia</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-center">Detalles</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-right">Monto</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50 text-black">
-            {cargando ? (
-              <tr><td colSpan={3} className="p-20 text-center font-bold text-gray-400 animate-pulse uppercase tracking-widest">Cargando inteligencia...</td></tr>
-            ) : datosFiltrados.map((item, i) => (
-              <tr key={i} className="hover:bg-gray-50/50 transition-colors">
-                {vista === 'inventario' ? (
-                  <>
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-gray-800">{item.nombre}</p>
-                      <p className="text-[10px] text-indigo-500 font-black uppercase">{item.proveedores?.nombre || "Sin Proveedor"}</p>
-                    </td>
-                    <td className="px-6 py-4 text-center font-medium">Stock: {item.stock} u.</td>
-                    <td className="px-6 py-4 text-right font-black">${((item.precio || 0) * (item.stock || 0)).toLocaleString()}</td>
-                  </>
-                ) : (
-                  <>
-                    <td className="px-6 py-4">
-                      <p className="text-xs font-bold text-gray-800">{new Date(item.created_at).toLocaleDateString()}</p>
-                      <p className="text-[10px] text-gray-400 uppercase font-bold">{new Date(item.created_at).toLocaleTimeString()}</p>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <p className="font-bold text-sm">{item.Productos?.nombre || "Eliminado"}</p>
-                      <p className="text-[10px] text-gray-400 font-black tracking-widest uppercase">Cantidad: {item.cantidad}</p>
-                    </td>
-                    <td className="px-6 py-4 text-right font-black text-green-700">${(item.total || 0).toLocaleString()}</td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto"> {/* <--- ESTA LÍNEA ES MAGIA */}
+            <table className="min-w-full text-left whitespace-nowrap">
+              <thead>
+                <tr className={vista === 'inventario' ? "bg-indigo-600 text-white" : "bg-green-600 text-white"}>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase text-left">Referencia</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase text-center">Detalles</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase text-right">Monto</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 text-black">
+                {cargando ? (
+                  <tr><td colSpan={3} className="p-20 text-center font-bold text-gray-400 animate-pulse uppercase tracking-widest">Cargando inteligencia...</td></tr>
+                ) : datosFiltrados.map((item, i) => (
+                  <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                    {vista === 'inventario' ? (
+                      <>
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-gray-800">{item.nombre}</p>
+                          <p className="text-[10px] text-indigo-500 font-black uppercase">{item.proveedores?.nombre || "Sin Proveedor"}</p>
+                        </td>
+                        <td className="px-6 py-4 text-center font-medium">Stock: {item.stock} u.</td>
+                        <td className="px-6 py-4 text-right font-black">${((item.precio || 0) * (item.stock || 0)).toLocaleString()}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-6 py-4">
+                          <p className="text-xs font-bold text-gray-800">{new Date(item.created_at).toLocaleDateString()}</p>
+                          <p className="text-[10px] text-gray-400 uppercase font-bold">{new Date(item.created_at).toLocaleTimeString()}</p>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <p className="font-bold text-sm">{item.Productos?.nombre || "Eliminado"}</p>
+                          <p className="text-[10px] text-gray-400 font-black tracking-widest uppercase">Cantidad: {item.cantidad}</p>
+                        </td>
+                        <td className="px-6 py-4 text-right font-black text-green-700">${(item.total || 0).toLocaleString()}</td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </main>
   );
