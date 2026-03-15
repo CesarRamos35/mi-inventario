@@ -4,268 +4,169 @@ import { supabase } from '@/lib/supabase';
 import FormularioProducto from '@/components/FormularioProductos';
 import FilaProducto from '@/components/FilaProductos';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { useEffect, useState, useCallback } from 'react';
 
-export default function Home() {
+export default function PaginaInventario() {
   const [sesion, setSesion] = useState<any>(null);
   const [productos, setProductos] = useState<any[]>([]);
+  const [proveedores, setProveedores] = useState<any[]>([]); 
   const [cargando, setCargando] = useState(true);
+  
+  // --- ESTADOS DE FILTROS ---
   const [busqueda, setBusqueda] = useState("");
-  const [filtroStock, setFiltroStock] = useState("todos"); // "todos", "critico", "normal"
+  const [filtroProveedor, setFiltroProveedor] = useState("todos");
+  const [filtroStock, setFiltroStock] = useState("todos");
+  const [precioMin, setPrecioMin] = useState<number | "">("");
   const [precioMax, setPrecioMax] = useState<number | "">("");
 
-  // --- LÓGICA DE FILTRADO INTELIGENTE ---
-  const productoFiltrados = productos.filter(p => {
-    const coincideNombre = p.nombre.toLowerCase().includes(busqueda.toLowerCase());
+  // Función principal de carga de datos
+  const cargarTodo = useCallback(async () => {
+    // Traemos productos con sus proveedores
+    const { data: prods, error: errorProds } = await supabase
+      .from('Productos')
+      .select('*, proveedores(nombre)')
+      .order('created_at', { ascending: false });
+    
+    // Traemos lista de proveedores para los selects
+    const { data: provs, error: errorProvs } = await supabase
+      .from('proveedores')
+      .select('id, nombre')
+      .order('nombre');
 
-    const coincideStock =
-      filtroStock === "todos" ? true :
-        filtroStock === "critico" ? p.stock < 5 :
-          p.stock >= 5;
+    if (errorProds) console.error("Error productos:", errorProds.message);
+    
+    setProductos(prods || []);
+    setProveedores(provs || []);
+    setCargando(false);
+  }, []);
 
-    const coincidePrecio = precioMax === "" ? true : p.precio <= precioMax;
-
-    return coincideNombre && coincideStock && coincidePrecio;
-  });
-
-  // 1. Cargar sesión y productos
+  // Efecto inicial y suscripción a sesión
   useEffect(() => {
-    const cargarProductos = async () => {
-      const { data } = await supabase
-        .from('Productos')
-        .select('*')
-        .order('created_at', { ascending: false });
-      setProductos(data || []);
-      setCargando(false);
-    };
-
-    cargarProductos();
-
-    // --- REALTIME ---
-    const canal = supabase
-      .channel('cambios-en-productos')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'Productos' },
-        () => {
-          cargarProductos();
-        }
-      )
-      .subscribe();
-
-    // Escuchar sesión
+    cargarTodo();
+    
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSesion(session);
     });
 
-    return () => {
-      supabase.removeChannel(canal);
-      authSub.unsubscribe();
-    };
-  }, []);
+    return () => authSub.unsubscribe();
+  }, [cargarTodo]);
 
-  const totalInversion = productos?.reduce((acc, p) => acc + (p.precio * p.stock), 0) || 0;
-  const totalProductos = productos?.length || 0;
-  const stockCritico = productos?.filter(p => p.stock < 5).length || 0;
-  const estaAutenticado = !!sesion;
+  // Lógica de filtrado en tiempo real
+  const productoFiltrados = productos.filter(p => {
+    const nombreProd = p.nombre || "";
+    const coincideNombre = nombreProd.toLowerCase().includes(busqueda.toLowerCase());
+    const coincideProveedor = filtroProveedor === "todos" ? true : String(p.proveedor_id) === filtroProveedor;
+    const coincideStock = filtroStock === "todos" ? true : filtroStock === "critico" ? p.stock < 5 : p.stock >= 5;
+    const coincidePrecioMin = precioMin === "" ? true : p.precio >= precioMin;
+    const coincidePrecioMax = precioMax === "" ? true : p.precio <= precioMax;
+    
+    return coincideNombre && coincideProveedor && coincideStock && coincidePrecioMin && coincidePrecioMax;
+  });
 
-  // --- CONFIGURACIÓN DEL PDF ---
-  const exportarPDF = () => {
-    const doc = new jsPDF();
-    const fecha = new Date().toLocaleDateString();
-
-    doc.setFontSize(20);
-    doc.setTextColor(30, 41, 59);
-    doc.text("INFORME DE INVENTARIO", 14, 22);
-
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Generado el: ${fecha}`, 14, 30);
-    doc.text("Estado actual del almacén en tiempo real", 14, 35);
-
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(14, 42, 182, 35, 3, 3, 'F');
-
-    doc.setFontSize(11);
-    doc.setTextColor(71, 85, 105);
-    doc.setFont("helvetica", "bold");
-    doc.text("MÉTRICAS CLAVE", 20, 50);
-
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(0);
-    doc.text(`Inversión Total: $${totalInversion.toLocaleString()}`, 20, 58);
-    doc.text(`Variedad de Productos: ${totalProductos} tipos`, 20, 66);
-
-    if (stockCritico > 0) {
-      doc.setTextColor(220, 38, 38);
-      doc.setFont("helvetica", "bold");
-      doc.text(`ALERTA: ${stockCritico} productos en stock crítico.`, 90, 58);
-    }
-
-    const cuerpoTabla = productos.map(p => [
-      p.nombre,
-      p.stock,
-      `$${p.precio.toLocaleString()}`,
-      `$${(p.precio * p.stock).toLocaleString()}`
-    ]);
-
-    autoTable(doc, {
-      startY: 92,
-      head: [['Descripción', 'Cant.', 'Precio Unit.', 'Subtotal']],
-      body: cuerpoTabla,
-      headStyles: { fillColor: [79, 70, 229], halign: 'center' },
-      styles: { fontSize: 9 }
-    });
-
-    doc.save(`Reporte_Inventario_${fecha}.pdf`);
-  };
-
-  if (cargando) return <div className="p-10 text-center text-gray-500">Cargando inventario...</div>;
+  if (cargando) return (
+    <div className="h-screen flex items-center justify-center bg-white">
+      <div className="text-center font-black text-indigo-600 animate-bounce uppercase tracking-tighter text-2xl">
+        Cargando Sistema...
+      </div>
+    </div>
+  );
 
   return (
-    <main className="p-10 max-w-5xl mx-auto">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <Link href="/" className="text-indigo-600 text-sm hover:underline font-medium">← Volver al Inicio</Link>
-          <h1 className="text-3xl font-bold text-gray-800">Gestión de Inventario</h1>
-        </div>
-        {estaAutenticado ? (
-          <button
-            onClick={async () => {
-              await supabase.auth.signOut();
-              window.location.reload();
-            }}
-            className="text-sm bg-gray-200 hover:bg-red-100 hover:text-red-600 px-4 py-2 rounded-lg transition-colors font-medium">
-            Cerrar Sesión
-          </button>
-        ) : (
-          <Link href="/login" className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
-            Entrar como Admin
-          </Link>
-        )}
+    <main className="p-10 max-w-7xl mx-auto text-black bg-slate-50/50 min-h-screen">
+      <div className="mb-8">
+        <Link href="/" className="text-indigo-600 text-xs font-black uppercase tracking-widest hover:underline">
+          ← Panel Principal
+        </Link>
+        <h1 className="text-4xl font-black text-gray-900 tracking-tighter">INVENTARIO INTELIGENTE</h1>
       </div>
 
+      {/* SECCIÓN: REGISTRO (Recibe onActualizar) */}
+      <FormularioProducto onActualizar={cargarTodo} />
 
-      {estaAutenticado && <FormularioProducto />}
+      {/* SECCIÓN: FILTROS */}
+      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 mb-8 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <input 
+            type="text" 
+            placeholder="Buscar por nombre..." 
+            className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none text-black focus:ring-2 focus:ring-indigo-500" 
+            value={busqueda} 
+            onChange={(e) => setBusqueda(e.target.value)} 
+          />
+          
+          <select 
+            className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-black" 
+            value={filtroProveedor} 
+            onChange={(e) => setFiltroProveedor(e.target.value)}
+          >
+            <option value="todos">Todos los proveedores</option>
+            {proveedores.map(prov => (
+              <option key={prov.id} value={prov.id}>{prov.nombre}</option>
+            ))}
+          </select>
 
-      {/* DASHBOARD DE MÉTRICAS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 mt-8">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-blue-500">
-          <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Valor del Inventario</p>
-          <p className="text-2xl font-bold text-gray-900">${totalInversion.toLocaleString()}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-green-500">
-          <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Productos Totales</p>
-          <p className="text-2xl font-bold text-gray-900">{totalProductos}</p>
-        </div>
-        <div className={`bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-l-4 ${stockCritico > 0 ? 'border-l-red-500' : 'border-l-gray-300'}`}>
-          <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Stock Crítico</p>
-          <p className={`text-2xl font-bold ${stockCritico > 0 ? 'text-red-600' : 'text-gray-900'}`}>
-            {stockCritico} <span className="text-sm font-normal text-gray-500">items bajos</span>
-          </p>
-        </div>
-      </div>
+          <select 
+            className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-black" 
+            value={filtroStock} 
+            onChange={(e) => setFiltroStock(e.target.value)}
+          >
+            <option value="todos">Cualquier stock</option>
+            <option value="critico">⚠️ Crítico (Menos de 5)</option>
+            <option value="normal">✅ Saludable</option>
+          </select>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-          {/* Búsqueda por Nombre */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-gray-500 uppercase">Nombre</label>
-            <input
-              type="text"
-              placeholder="Ej: Cerveza..."
-              className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-            />
-          </div>
-
-          {/* Filtro por Estado de Stock */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-gray-500 uppercase">Estado de Stock</label>
-            <select
-              className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-              value={filtroStock}
-              onChange={(e) => setFiltroStock(e.target.value)}
-            >
-              <option value="todos">Todos los productos</option>
-              <option value="critico">Stock Crítico {"(< 5)"}</option>
-              <option value="normal">Stock Saludable {"(>= 5)"}</option>
-            </select>
-          </div>
-
-          {/* Filtro por Precio Máximo */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-gray-500 uppercase">Precio Máximo</label>
-            <div className="relative">
-              <span className="absolute left-3 top-2 text-gray-400">$</span>
-              <input
-                type="number"
-                placeholder="Ej: 50"
-                className="w-full p-2 pl-7 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black"
-                value={precioMax}
-                onChange={(e) => setPrecioMax(e.target.value === "" ? "" : Number(e.target.value))}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Contador de resultados */}
-        <div className="mt-4 flex justify-between items-center text-sm">
-          <p className="text-gray-500">
-            Mostrando <span className="font-bold text-indigo-600">{productoFiltrados.length}</span> productos
-          </p>
-          {(busqueda || filtroStock !== "todos" || precioMax !== "") && (
-            <button
-              onClick={() => { setBusqueda(""); setFiltroStock("todos"); setPrecioMax(""); }}
-              className="text-indigo-600 hover:text-indigo-800 font-medium underline transition-colors"
-            >
-              Limpiar filtros
-            </button>
-          )}
+          <input 
+            type="number" 
+            placeholder="Precio Min $" 
+            className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-black" 
+            value={precioMin} 
+            onChange={(e) => setPrecioMin(e.target.value === "" ? "" : Number(e.target.value))} 
+          />
+          
+          <input 
+            type="number" 
+            placeholder="Precio Max $" 
+            className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-black" 
+            value={precioMax} 
+            onChange={(e) => setPrecioMax(e.target.value === "" ? "" : Number(e.target.value))} 
+          />
         </div>
       </div>
 
-      {/* DESCARGAR PDF */}
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-bold text-gray-400 uppercase invisible">Exportar</label>
-        <button
-          onClick={exportarPDF}
-          className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm transition-all active:scale-95 group"
-        >
-          <span className="text-lg group-hover:animate-bounce">📄</span>
-          <span className="text-sm">Exportar Informe</span>
-        </button>
-      </div>
-
-      {/* TABLA DE DATOS */}
-      <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
+      {/* SECCIÓN: TABLA DE PRODUCTOS */}
+      <div className="bg-white shadow-xl rounded-[2rem] border border-gray-100 overflow-hidden">
         <table className="min-w-full">
           <thead>
-            <tr className="bg-gray-100 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              <th className="px-5 py-3 text-center w-20">Vista</th>
-              <th className="px-5 py-3">Nombre del Producto</th>
-              <th className="px-5 py-3">Stock</th>
-              <th className="px-5 py-3">Precio</th>
-              <th className="px-5 py-3 text-right">Acciones</th>
+            <tr className="bg-gray-50/50 border-b text-left">
+              <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase text-center tracking-widest">Imagen</th>
+              <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Producto</th>
+              <th className="px-6 py-5 text-[10px] font-black text-indigo-500 uppercase tracking-widest">Proveedor</th>
+              <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase text-center tracking-widest">Stock</th>
+              <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase text-center tracking-widest">Precio</th>
+              <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase text-right tracking-widest">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
-            {productoFiltrados.map((prod) => (
-              <FilaProducto key={prod.id} prod={prod} esAdmin={estaAutenticado} />
-            ))}
+          <tbody className="divide-y divide-gray-50">
+            {productoFiltrados.length > 0 ? (
+              productoFiltrados.map((prod) => (
+                <FilaProducto 
+                  key={prod.id} 
+                  prod={prod} 
+                  esAdmin={!!sesion} 
+                  proveedores={proveedores}
+                  onActualizar={cargarTodo} 
+                />
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="px-6 py-10 text-center text-gray-400 italic">
+                  No se encontraron productos con esos filtros.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
-      <Link 
-  href="/inventario/historial" 
-  className="text-xs bg-white border border-gray-300 px-3 py-1 rounded-md hover:bg-gray-50 font-bold text-gray-600 transition-all shadow-sm"
->
-  Ver Historial 🕒
-</Link>
     </main>
   );
 }
