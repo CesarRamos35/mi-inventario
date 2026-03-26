@@ -16,7 +16,7 @@ export default function PaginaVentas() {
   const [carrito, setCarrito] = useState<any[]>([]);
   const [cliente, setCliente] = useState("Público General");
 
-  // Estado para el recibo (Ahora acepta lista de productos)
+  // Estado para el recibo
   const [ultimaVenta, setUltimaVenta] = useState<any>({
     productos: [],
     total: 0,
@@ -31,7 +31,14 @@ export default function PaginaVentas() {
       if (!session) { router.push('/'); return; }
       setVendedor(session.user.email || "usuario@test.com");
 
-      const { data } = await supabase.from('Productos').select('*').gt('stock', 0).order('nombre');
+      // MODIFICACIÓN CLAVE: Filtramos por stock > 0 Y que el producto esté activo
+      const { data } = await supabase
+        .from('Productos')
+        .select('*')
+        .gt('stock', 0)
+        .eq('activos', true) // <--- Solo productos que no han sido "eliminados"
+        .order('nombre');
+      
       setProductos(data || []);
     };
     cargarDatos();
@@ -72,7 +79,7 @@ export default function PaginaVentas() {
     try {
       const totalVenta = carrito.reduce((acc, item) => acc + item.subtotal, 0);
 
-      // 1. INSERTAR EN TABLA VENTAS (Cabecera)
+      // 1. INSERTAR EN TABLA VENTAS
       const { data: ventaPrincipal, error: errorVenta } = await supabase
         .from('ventas')
         .insert([{ 
@@ -85,7 +92,7 @@ export default function PaginaVentas() {
 
       if (errorVenta) throw errorVenta;
 
-      // 2. INSERTAR EN DETALLE_VENTAS Y ACTUALIZAR STOCK
+      // 2. INSERTAR DETALLES Y ACTUALIZAR STOCK
       for (const item of carrito) {
         await supabase.from('detalle_ventas').insert([{
           venta_id: ventaPrincipal.id,
@@ -110,13 +117,18 @@ export default function PaginaVentas() {
         fecha: new Date().toLocaleString('es-BO')
       });
 
-      // 4. IMPRESIÓN CON RETRASO PARA MÓVILES
+      // 4. IMPRESIÓN
       setTimeout(() => {
         window.print();
         setCarrito([]);
         setCliente("Público General");
         setCargando(false);
-        router.refresh(); // Refresca stock de la página
+        // Recargar datos locales para reflejar el nuevo stock
+        const cargarDatos = async () => {
+            const { data } = await supabase.from('Productos').select('*').gt('stock', 0).eq('activo', true).order('nombre');
+            setProductos(data || []);
+        };
+        cargarDatos();
       }, 800);
 
     } catch (err: any) {
@@ -128,7 +140,7 @@ export default function PaginaVentas() {
   return (
     <main className="p-4 sm:p-10 max-w-5xl mx-auto text-black min-h-screen">
       
-      {/* --- SECCIÓN DEL RECIBO (Solo visible al imprimir) --- */}
+      {/* --- RECIBO --- */}
       <div id="recibo-impresion" className="fixed top-0 left-[-1000px] print:static print:block p-4 text-black font-mono text-[11px] w-[80mm] bg-white">
         <div className="text-center border-b border-dashed pb-2 mb-2">
           <img src="/logo-crb2.png" alt="Logo" className="mx-auto w-16 h-auto mb-1" />
@@ -164,14 +176,13 @@ export default function PaginaVentas() {
         <p className="text-center mt-6 uppercase">*** Gracias por su compra ***</p>
       </div>
 
-      {/* --- INTERFAZ DE VENTA (Oculta al imprimir) --- */}
+      {/* --- INTERFAZ --- */}
       <div className="print:hidden">
         <Link href="/" className="text-indigo-600 font-bold text-sm">← Volver al Panel</Link>
         <h1 className="text-3xl sm:text-4xl font-black my-6 tracking-tighter uppercase italic">Venta Directa 💰</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Columna Izquierda: Formulario */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100">
               <div className="mb-6">
@@ -219,7 +230,6 @@ export default function PaginaVentas() {
               </form>
             </div>
 
-            {/* Tabla de Items */}
             <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
               <table className="w-full text-left text-sm">
                 <thead className="bg-gray-50 text-gray-400 text-[10px] uppercase font-black">
@@ -249,7 +259,6 @@ export default function PaginaVentas() {
             </div>
           </div>
 
-          {/* Columna Derecha: Resumen de Pago */}
           <div className="lg:col-span-1">
             <div className="bg-gray-900 text-white p-8 rounded-[2.5rem] shadow-2xl h-fit sticky top-10">
               <h2 className="text-xl font-black mb-6 flex justify-between items-center">

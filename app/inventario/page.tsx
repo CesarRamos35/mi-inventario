@@ -25,6 +25,7 @@ export default function PaginaInventario() {
     const { data: prods, error: errorProds } = await supabase
       .from('Productos')
       .select('*, proveedores(nombre)')
+      .eq('activos', true)
       .order('created_at', { ascending: false });
 
     // Traemos lista de proveedores para los selects

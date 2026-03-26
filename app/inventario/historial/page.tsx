@@ -7,6 +7,8 @@ export default function PaginaHistorial() {
   const [logs, setLogs] = useState<any[]>([]);
   const [filtroUsuario, setFiltroUsuario] = useState("");
   const [filtroAccion, setFiltroAccion] = useState("");
+  const [filtroProducto, setFiltroProducto] = useState(""); 
+  const [filtroFecha, setFiltroFecha] = useState(""); 
 
   useEffect(() => {
     const verificarSesion = async () => {
@@ -16,30 +18,41 @@ export default function PaginaHistorial() {
     verificarSesion();
 
     const cargarTodoElHistorial = async () => {
-      // 1. Cargamos Logs manuales
       const { data: historialData } = await supabase.from('Historial').select('*');
 
-      // 2. Cargamos Detalles de Ventas con casting 'any' para evitar que TS se queje
       const { data: detallesData, error }: any = await supabase
         .from('detalle_ventas')
         .select(`
-      id,
-      cantidad,
-      subtotal,
-      producto_id,
-      Productos (nombre),
-      ventas (created_at, usuario_email, cliente_nombre)
-    `);
+          id,
+          cantidad,
+          subtotal,
+          producto_id,
+          Productos (nombre),
+          ventas (created_at, usuario_email, cliente_nombre)
+        `);
 
       if (error) console.error("Error cargando historial:", error);
 
-      const logsHistorial = (historialData || []).map(h => ({
-        ...h,
-        usuario_email: h.usuario_email || "sistema@negocio.com",
-        fecha: h.fecha || new Date().toISOString()
-      }));
+      // --- LÓGICA DE DETECCIÓN MEJORADA ---
+      const logsHistorial = (historialData || []).map(h => {
+        const detalleMin = (h.detalles || "").toLowerCase();
+        
+        // Si es una edición pero el detalle menciona "false" (de tu columna activos: false)
+        // o menciona "desactivado", lo tratamos como ELIMINACIÓN
+        const esBorradoLogico = h.accion === 'EDICIÓN' && (
+          detalleMin.includes("false") || 
+          detalleMin.includes("desactivado") ||
+          detalleMin.includes("activos")
+        );
+        
+        return {
+          ...h,
+          accion: esBorradoLogico ? 'ELIMINACIÓN' : h.accion,
+          usuario_email: h.usuario_email || "sistema@negocio.com",
+          fecha: h.fecha || new Date().toISOString()
+        };
+      });
 
-      // 3. Transformamos los datos (usando casting de objeto para leer las propiedades)
       const logsVentas = (detallesData || []).map((d: any) => ({
         id: d.id,
         fecha: d.ventas?.created_at,
@@ -48,7 +61,6 @@ export default function PaginaHistorial() {
         accion: 'VENTA',
         detalles: `Venta a ${d.ventas?.cliente_nombre || 'Cliente'} - Cant: ${d.cantidad} (Subtotal: ${d.subtotal} Bs.)`
       }));
-      
 
       const unificados = [...logsHistorial, ...logsVentas].sort((a, b) =>
         new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
@@ -60,21 +72,30 @@ export default function PaginaHistorial() {
     cargarTodoElHistorial();
   }, []);
 
-  // --- LÓGICA DE FILTRADO ---
   const logsFiltrados = logs.filter(log => {
     const coincideUsuario = (log.usuario_email || "Sistema")
       .toLowerCase()
       .includes(filtroUsuario.toLowerCase());
 
+    const coincideProducto = (log.producto_nombre || "")
+      .toLowerCase()
+      .includes(filtroProducto.toLowerCase());
+
     const coincideAccion = filtroAccion === "" ? true : log.accion === filtroAccion;
-    return coincideUsuario && coincideAccion;
+
+    let coincideFecha = true;
+    if (filtroFecha !== "") {
+      const fechaLog = new Date(log.fecha).toISOString().split('T')[0];
+      coincideFecha = fechaLog === filtroFecha;
+    }
+
+    return coincideUsuario && coincideAccion && coincideProducto && coincideFecha;
   });
 
   return (
-    <main className="p-10 max-w-6xl mx-auto text-black">
+    <main className="p-10 max-w-7xl mx-auto text-black">
       <div className="flex justify-between items-end mb-8">
         <div>
-
           <div className="flex gap-4 mb-2">
             <Link href="/" className="text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-indigo-600 transition-colors">
               🏠 Menú Principal
@@ -84,41 +105,61 @@ export default function PaginaHistorial() {
               📦 Mostrar Inventario
             </Link>
           </div>
-
           <h1 className="text-4xl font-black tracking-tighter uppercase">Libro de Auditoría</h1>
           <p className="text-gray-400 text-xs font-bold uppercase">Movimientos manuales y ventas por carrito</p>
         </div>
       </div>
 
-      {/* FILTROS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      {/* Filtros */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-          <label className="text-[10px] font-black text-gray-400 uppercase mb-1 block ml-2">Filtrar por Usuario</label>
+          <label className="text-[10px] font-black text-gray-400 uppercase mb-1 block ml-2">Producto</label>
           <input
             type="text"
-            placeholder="Email del responsable..."
+            placeholder="Buscar por producto..."
+            className="w-full p-2 bg-gray-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            value={filtroProducto}
+            onChange={(e) => setFiltroProducto(e.target.value)}
+          />
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+          <label className="text-[10px] font-black text-gray-400 uppercase mb-1 block ml-2">Fecha Exacta</label>
+          <input
+            type="date"
+            className="w-full p-2 bg-gray-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+            value={filtroFecha}
+            onChange={(e) => setFiltroFecha(e.target.value)}
+          />
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+          <label className="text-[10px] font-black text-gray-400 uppercase mb-1 block ml-2">Responsable</label>
+          <input
+            type="text"
+            placeholder="Email..."
             className="w-full p-2 bg-gray-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
             value={filtroUsuario}
             onChange={(e) => setFiltroUsuario(e.target.value)}
           />
         </div>
+
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-          <label className="text-[10px] font-black text-gray-400 uppercase mb-1 block ml-2">Tipo de Acción</label>
+          <label className="text-[10px] font-black text-gray-400 uppercase mb-1 block ml-2">Evento</label>
           <select
             className="w-full p-2 bg-gray-50 rounded-xl text-sm font-bold outline-none cursor-pointer"
             value={filtroAccion}
             onChange={(e) => setFiltroAccion(e.target.value)}
           >
-            <option value="">TODAS LAS ACCIONES</option>
+            <option value="">TODOS</option>
             <option value="CREACIÓN">CREACIÓN</option>
             <option value="EDICIÓN">EDICIÓN</option>
             <option value="ELIMINACIÓN">ELIMINACIÓN</option>
-            <option value="VENTA">VENTAS (CARRITO)</option>
+            <option value="VENTA">VENTA</option>
           </select>
         </div>
       </div>
 
-      {/* TABLA DE LOGS */}
       <div className="bg-white shadow-2xl rounded-[2rem] overflow-hidden border border-gray-100">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left whitespace-nowrap">
@@ -135,6 +176,7 @@ export default function PaginaHistorial() {
               {logsFiltrados.map((log) => {
                 const nombreLimpio = log.usuario_email ? log.usuario_email.split('@')[0] : "usuario";
                 const esVenta = log.accion === 'VENTA';
+                const esEliminacion = log.accion === 'ELIMINACIÓN';
 
                 return (
                   <tr key={log.id} className="hover:bg-slate-50 transition-colors">
@@ -153,14 +195,15 @@ export default function PaginaHistorial() {
                       {log.producto_nombre}
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase ${log.accion === 'CREACIÓN' ? 'bg-green-50 text-green-600' :
-                          log.accion === 'EDICIÓN' ? 'bg-blue-50 text-blue-600' :
-                            log.accion === 'VENTA' ? 'bg-orange-50 text-orange-600' : 'bg-red-50 text-red-600'
-                        }`}>
+                      <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase ${
+                        log.accion === 'CREACIÓN' ? 'bg-green-50 text-green-600' :
+                        log.accion === 'EDICIÓN' ? 'bg-blue-50 text-blue-600' :
+                        log.accion === 'VENTA' ? 'bg-orange-50 text-orange-600' : 'bg-red-50 text-red-600'
+                      }`}>
                         {log.accion}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-xs text-gray-500 italic font-medium">
+                    <td className={`px-6 py-4 text-xs italic font-medium ${esEliminacion ? 'text-red-500' : 'text-gray-500'}`}>
                       {log.detalles}
                     </td>
                   </tr>
@@ -168,9 +211,6 @@ export default function PaginaHistorial() {
               })}
             </tbody>
           </table>
-          {logsFiltrados.length === 0 && (
-            <div className="text-center py-20 text-gray-400 font-black uppercase text-xs">Sin resultados</div>
-          )}
         </div>
       </div>
     </main>
